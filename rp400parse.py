@@ -1,34 +1,53 @@
 # Распознавание текста на скриншотах.
-# Спасибо разработчикам, сохранившим данные в виде скриншота
-#
+# Спасибо разработчикам, сохранившим данные в виде скриншота.
+# Используется библиотека pytesseract (https://pypi.org/project/pytesseract/) и pillow
+# Ради распознавания кириллицы прикручен tesseract-ocr-rus
+
 import os
 import pytesseract
 from PIL import Image
 import pandas as pd
 from datetime import datetime
 
-SOURCE = '/opt/datasets/rp400/172.16.41.108/usbdisk/disk_a_1/screenshots'
-DATASET1 = '/opt/datasets/rp400/dataset1.txt'
-LEFT_X = 32
-LEFT_Y = 388
-RIGHT_X = 743
-RIGHT_Y = 418
+SOURCE = '/opt/datasets/rp400/'
+NUMBER = (31, 386, 198, 424)        # Координаты поля номера оси
+OPERATOR = (574, 381, 743, 418)     # Координаты поля фамилии оператора
+# pr = pd.DataFrame()
 
 if __name__ == '__main__':
-    files = os.listdir(SOURCE)
-    for x in files:
-        fullname = SOURCE + '/' + x
-        string = datetime.fromtimestamp(os.path.getmtime(fullname)).strftime('%Y-%m-%d %H:%M:%S').split(' ')
-        image = Image.open(fullname)
-        image_cropped = image.crop((LEFT_X, LEFT_Y, RIGHT_X, RIGHT_Y))
-        st = pytesseract.image_to_string(image_cropped, lang='rus').split(" ")
-        print("Файл ", x, "распознана строка:", st)
-        first = "null" if st[0] == "" else st[0]
-        second = "null" if st[1] == "" else st[1]
-        string.append(first)
-        string.append(second)
-        # string.append(st)
-        string.append(x)
-        # string = [line.rstrip() for line in string]
+    for i in range(2):
+        cat = SOURCE + 'rp400-' + str(i + 1)
+        print("Обработка каталога ", cat)
+        press = []
+        files = os.listdir(cat)
+        file_counter = 0
+        for x in files:
+            file_counter += 1
 
-        print(string)
+            fullname = cat + '/' + x     # Полное имя с путями, для вытаскивания даты следующим шагом
+            string = datetime.fromtimestamp(os.path.getmtime(fullname)).strftime('%Y-%m-%d %H:%M:%S').split(' ')
+
+            # Тащим pillow для подготовки изображения к OCR. Кропаем поле по заданным координатам.
+            image = Image.open(fullname)
+            cropped = image.crop(NUMBER)
+            # Распознаём числовое поле с номером оси, если он указан. Обрезаем символ '\n'.
+            # В опциях метода указываем белый список символов для повышения качества OCR.
+            recognized = pytesseract.image_to_string(cropped, config='-c tessedit_char_whitelist=0123456789')
+            axis = '' if recognized == '' else recognized.rstrip()
+
+            cropped = image.crop(OPERATOR)
+            # Распознаём текстовое поле с фамилией оператора, если она указана. Обрезаем символ '\n'.
+            # В опциях метода указываем язык и параметр psm для одиночного слова.
+            recognized = pytesseract.image_to_string(cropped, lang='rus', config='-c --psm=8')
+            worker = '' if recognized == '' else recognized.rstrip()
+
+            string.append(axis)
+            string.append(worker)
+            press.append(string)
+
+        with open(cat + '.txt', 'w') as dataset_file:
+            rows = 0  # uploaded strings counter
+            for w in press:
+                dataset_file.write(f"{w}\n")
+                rows += 1
+            print(rows, 'строк')
