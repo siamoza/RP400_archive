@@ -44,7 +44,7 @@ if __name__ == '__main__':
             # И в итоговый список списков.
             press.append(string)
 
-    # Здесь не используем pandas. Потому что попробуй с пандами и увидишь.
+    # Здесь не используем pandas. Потому что попробуй с пандами и сам увидишь.
     with open(DATASET, 'w') as dataset_file:
         rows = 0
         for w in press:
